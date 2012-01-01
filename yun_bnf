@@ -1,0 +1,37 @@
+program --> stmt* | {stmt*}
+stmt --> if-else | dowhile | whiledo |for-stmt| assign
+if-else --> if (exp)  stmt  else  stmt 
+dowhile  --> do  stmt  while ( exp )
+whiledo  --> do  stmt  while ( exp )
+for-stmt  --> for ( exp, exp, exp )  stmt 
+assign --> id=exp
+exp --> [ factor ] op  factor | factor op [factor] | factor 
+op --> add | sub | mul | div | equ | grt | less | ge | le | ne
+factor --> exp | (exp) |  var | number | function
+
+program := stmt* | do stmt* od*
+stmt := if | while | for | assign | id_def | func_def
+if := if exp do stmt od [elif exp do stmt od]* [else stmt]
+while := while exp do stmt od | do stmt od while exp
+for := for exp in exp do stmt od
+assign := id=exp
+id_def := [const] [type] id [=exp] [, id [=exp]]*; 
+func_def := function id([const][type]id[=exp][,[const][type]id[=exp]]*) do stmt od
+exp := factor op factor | factor
+op := add | sub | mul | div | equ | grt | less | ge | le | ne | and | or
+factor := exp | id | number | func_call
+func_call := id([exp[,exp]*])
+
+
+http://silencethinking.blog.163.com/blog/static/9114905620106231136217/
+
+hehe = ((h-(dd + 6))+(4+g));
+const cc = 5, bb, dd = 6;
+double x , y = 0.3543, c, d = 9548;
+
+function func( a, int b, c )
+do
+    b = 33.121324234;
+    c = 0.00001;
+    a = b + c;
+od

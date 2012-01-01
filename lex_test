@@ -1,0 +1,19 @@
+function func( a, int b, c )
+do
+    b = 33.121324234;
+    c = 0.00001;
+    a = b + c;
+    do
+        ha  = a + b * c;
+        he = (a+b)/(c+b);
+        do
+            x = "hahahehe";
+            y = x + x;
+        od
+    od
+od
+
+if func(0,0,0) do
+    haha = a = 5;
+od
+
