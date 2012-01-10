@@ -1,8 +1,8 @@
 /**
- * @file: yun_vm.h
- * @brief: vm
- * @date: Oct 15, 2011
- * @author: pozen
+ * pozen@yl:~>file 'yun_vm.h'
+ * pozen@yl:~>brief 'vm'
+ * pozen@yl:~>date 'Oct 15, 2011'
+ * pozen@yl:~>author 'pozen'
  */
 
 #ifndef __YUN_VM_H_

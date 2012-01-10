@@ -1,8 +1,8 @@
- /**
- * @file: yun_parser.h
- * @brief: syntax analysis
- * @date: Oct 15, 2011
- * @author: pozen
+/**
+ * pozen@yl:~>file 'yun_parser.c'
+ * pozen@yl:~>brief 'syntax analysis'
+ * pozen@yl:~>date 'Oct 15, 2011'
+ * pozen@yl:~>author 'pozen'
  */
 
 #include "yun_parser.h"
@@ -31,6 +31,8 @@ const priority prior_table[] = {
 		{ '/', 28 },
 		{ 0, 0 }
 };
+
+size_t  global_id_num;
 
 static SynNode *syn_id_def_parse( SynState *ss, SynNode *parent, int step, int type, int const_flag );
 static SynNode *syn_exp_parse( SynState *ss, SynNode *parent );
@@ -90,58 +92,61 @@ static SynNode *syn_create_node( int type, int subType, SynState *ss )
 	return node;
 }
 
-static int syn_sym_qurry( SynNode *pos, char *name )
+static Symbol* syn_sym_qurry( SynNode *pos, char *name )
+{
+    while( pos )
+    {
+    	if( pos->type == DOMAIN )
+    	{
+    		Symbol *tmp = pos->sym_table;
+    		while( tmp )
+    		{
+    	    	if( strcmp( tmp->name, name ) == 0 )
+    	    		return tmp;
+    	    	tmp  = tmp->next;
+    		}
+    	}
+    	pos = pos->parent;
+    }
+    return 0;
+}
+
+static int syn_update_sym_table( SynNode *pos, char *name, int type, char *value )
 {
 	if( !pos )
 		return -1;
-	//pos = pos->parent;
 	while( pos->type != DOMAIN && pos->parent )
 		pos = pos->parent;
 	if( pos->type != DOMAIN ) return -1;
-    Symbol *tmp = pos->sym_table;
-    if( 0 == tmp )
-    	return -1;
-    while( tmp->next )
-    {
-    	if( strcmp( tmp->name, name ) == 0 )
-    		return tmp->index;
-    	tmp  = tmp->next;
-    }
-    return -1;
-}
-
-static void syn_update_sym_table( SynNode *pos, char *name, int type, char *value )
-{
-	if( !pos )
-		return;
-	//pos = pos->parent;
-	while( pos->type != DOMAIN && pos->parent )
-		pos = pos->parent;
-	if( pos->type != DOMAIN ) return;
     Symbol *sb = (Symbol*)malloc( sizeof( Symbol ) );
     Symbol *tmp = pos->sym_table;
     sb->name = name;
     sb->type = type;
     sb->value.str_val = value;
     sb->next = 0;
-    sb->index = 0;
+    sb->func_info = (void*)pos;
+    sb->index = -1;
     if( 0 == pos->sym_table )
     {
+    	sb->index = global_id_num++;
     	pos->sym_table = sb;
-    	return;
+    	return sb->index;
     }
     int flag = 0;
-    while( tmp->next )
+    while( tmp )
     {
     	if( strcmp( tmp->name, name ) == 0 )
     		flag = 1;//error ID is defined multiple times in the same domain
+    	if( 0 == tmp->next )
+    		break;
     	tmp  = tmp->next;
     }
     if( !flag )
     {
     	tmp->next = sb;
-    	sb->index = tmp->index + 1;
+    	sb->index = global_id_num++;//tmp->index + 1;
     }
+    return sb->index;
 }
 
 static SynNode *syn_id_def_parse( SynState *ss, SynNode *parent, int step, int type, int func_flag ) /* func_flag is for func_def parsing */
@@ -149,8 +154,8 @@ static SynNode *syn_id_def_parse( SynState *ss, SynNode *parent, int step, int t
 	SynNode *node = 0, *node2 = 0;
 	if( syn_token_type( ss ) == TK_ID )
 	{
-		node = syn_create_node( -1, -1, ss ); node->parent = parent;
-		syn_update_sym_table( node, syn_token_value( ss ), syn_token_type( ss ), 0 );
+		node = syn_create_node( STMT, VAR_DEF, ss ); node->parent = parent;
+		node->rnum = syn_update_sym_table( node, syn_token_value( ss ), syn_token_type( ss ), 0 );
 		syn_token_next( ss );
 		if( syn_token_type( ss ) == '=' )
 		{
@@ -232,7 +237,7 @@ static SynNode *syn_func_def_parse( SynState *ss, SynNode *parent )
 	if( syn_token_type( ss ) != TK_ID )
 		return node;
 	node = syn_create_node( DOMAIN, FUNC_DEF, ss );
-	syn_update_sym_table( node, syn_token_value( ss ), FUNC, 0 );
+	node->rnum = syn_update_sym_table( node, syn_token_value( ss ), FUNC, 0 );
 	syn_token_next( ss );
 	if( syn_token_type( ss ) != '(' )
 		;//error
@@ -294,6 +299,28 @@ static SynNode *syn_while_do_parse( SynState *ss, SynNode *parent )
 	return node;
 }
 
+static SynNode *syn_func_call_parse( SynState *ss, SynNode *parent )
+{
+	SynNode *node = 0, *fnode, *plist;
+	Symbol *sym = syn_sym_qurry( parent, syn_token_value( ss ) );
+	fnode = (SynNode*)sym->func_info;
+	plist = fnode->lchild;
+	syn_token_next( ss );
+	int ty = syn_token_type( ss );
+	if( ty != '(' )
+		;//error
+
+	while( plist )
+	{
+		syn_token_next( ss );
+	    ty = syn_token_type( ss );
+	    if( TK_ID == ty )
+	    {
+	    	Symbol *tmp = syn_qurry_symtable( parent );
+	    }
+	}
+	return node;
+}
 static SynNode *syn_exp_parse( SynState *ss, SynNode *parent )
 {
 	SynNode *node = 0;
@@ -302,18 +329,20 @@ static SynNode *syn_exp_parse( SynState *ss, SynNode *parent )
 	switch( ty )
 	{
 	case TK_ID: //MISS FUNC CALL
-		index = syn_sym_qurry( parent, syn_token_value( ss ) );
+		Symbol *tmp = syn_sym_qurry( parent, syn_token_value( ss ) );
 		if( index < 0 )
 			;//error
 		node = syn_create_node( EXP, ID, ss );
-		node->rnum = index;
+		node->rnum = tmp->index;
 	case TK_CONST_VALUE:
 		if( ty != TK_ID )
 		{
 			node = syn_create_node( EXP, CONST, ss );
-			index = syn_sym_qurry( parent, syn_token_value( ss ) );
-			if( index < 0 )
-				syn_update_symtable( parent,  )
+			node->parent = parent;
+			Symbol *tmp = syn_sym_qurry( node, syn_token_value( ss ) );
+			if( tmp->index < 0 )
+				node->rnum = syn_update_symtable( node, 0, CONST, ss->pos->token.value );
+			else node->rnum = tmp->index;
 		}
 		syn_token_next( ss );
 	    ty = syn_token_type( ss );
@@ -404,6 +433,20 @@ static SynNode *syn_domain_parse( SynState *ss, SynNode *parent )
 				break;
 			if( 0 ) /* func call */
 				break;
+			Symbol *tmp_sym = syn_sym_qurry( parent, syn_token_value( ss ) );
+			if( tmp_sym )
+			{
+				if( FUNC != tmp_sym->type )
+				{
+					node = syn_exp_parse( ss, parent );
+					node->parent = parent;
+				}
+				else
+				{
+					//func call
+				}
+				break;
+			}
 		case Tk_CONST:
 		case TK_INT:
 		case TK_LONG:
@@ -419,7 +462,7 @@ static SynNode *syn_domain_parse( SynState *ss, SynNode *parent )
 			node = syn_id_def_parse( ss, parent, 0 , syn_token_type( ss ), 0 );
 			node->parent = parent;
 			tmp = node;
-			while( tmp ) /* add id_def to symbol table */
+			while( tmp ) /* add id_def to symbol table del?*/
 			{
 				if( tmp->subType.stmt == ASSIGN )
 				{
@@ -514,6 +557,7 @@ static SynNode *syn_domain_parse( SynState *ss, SynNode *parent )
 
 SynNode *syn_parse( SynState *ss )
 {
+	global_id_num = 0;
 	SynNode *node = syn_create_node( DOMAIN, GLOBAL, ss );
 	syn_insert_lchild( node, syn_domain_parse( ss, node ) );
 	syn_node_print( node, 0 );

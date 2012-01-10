@@ -1,8 +1,8 @@
 /**
- * @file: yun_parser.h
- * @brief: syntax analysis
- * @date: Oct 3, 2011
- * @author: pozen
+ * pozen@yl:~>file 'yun_parser.h'
+ * pozen@yl:~>brief 'syntax analysis'
+ * pozen@yl:~>date 'Oct 3, 2011'
+ * pozen@yl:~>author 'pozen'
  */
 
 #ifndef __YUN_PARSER_H_
@@ -47,7 +47,7 @@ typedef struct SynNode{
 	}subType;
 	int op;
 	int rnum;
-    SymValue value;
+    Symbol node_sym;
     Symbol *sym_table; /* for domain node */
     Symbol *sym_table_const;
 	struct SynNode* parent; /* ONLY for searching domain */

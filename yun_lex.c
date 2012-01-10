@@ -1,9 +1,10 @@
 /**
- * @file: yun_lex.h
- * @brief: lex analysis
- * @date: Oct 2, 2011
- * @author: pozen
+ * pozen@yl:~>file 'yun_lex.c'
+ * pozen@yl:~>brief 'lex analysis'
+ * pozen@yl:~>date 'Oct 2, 2011'
+ * pozen@yl:~>author 'pozen'
  */
+
 #include "yun_lex.h"
 #include <stdio.h>
 #include <stdlib.h>

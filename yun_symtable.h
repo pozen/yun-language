@@ -1,8 +1,8 @@
 /**
- #file: yun_symtable.h
- #brief: symbol table
- #date: Oct 5, 2011
- #author: pozen
+ * pozen@yl:~>file 'yun_symtable.h'
+ * pozen@yl:~>brief 'symbol table'
+ * pozen@yl:~>date 'Oct 5, 2011'
+ * pozen@yl:~>author 'pozen'
  */
 
 #ifndef __YUN_SYMTABLE_H_
@@ -48,6 +48,7 @@ typedef struct Symbol
 	SymType type;
 	int index;
 	struct Symbol *next;
+	void *func_info;
 }Symbol;
 
 #define SYMBOL_TABLE_LEN 257 /* hash */

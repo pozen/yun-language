@@ -1,8 +1,8 @@
 /**
- * @file: yun_vm.c
- * @brief: vm
- * @date: Oct 22, 2011
- * @author: pozen
+ * pozen@yl:~>file 'yun_vm.c'
+ * pozen@yl:~>brief 'vm'
+ * pozen@yl:~>date 'Oct 22, 2011'
+ * pozen@yl:~>author 'pozen'
  */
 
 #include "yun_vm.h"
