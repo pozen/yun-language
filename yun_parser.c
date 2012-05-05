@@ -29,6 +29,7 @@ const priority prior_table[] = {
 		{ '%', 28 },
 		{ '*', 28 },
 		{ '/', 28 },
+		//{ '(', 29 },
 		{ 0, 0 }
 };
 
@@ -48,7 +49,7 @@ static int syn_prior_cmp( int type1, int type2 )
 		if( prior_table[i].type == type2 )
 			v2 = prior_table[i].prior;
 	}
-	if( 0 == v1 || 0 == v2 ) return 0;
+	if( 0 == v1 || 0 == v2 ) return -2;
 	return v1 > v2 ? 1 : v1 == v2 ? 0 : -1;
 }
 
@@ -57,14 +58,17 @@ static SynNode *syn_adjust_prior( SynNode *node )
 	SynNode *c = node->rchild, *p = node->parent, *tmp;
 	if( !c )
 		return node;
-	if( syn_prior_cmp( node->type, c->type ) > 0 )
+	if( syn_prior_cmp( node->subType.exp, c->subType.exp ) >= 0 )
 	{
 		tmp = c->lchild;
 		c->lchild = node;
 		node->rchild = tmp;
 		node->parent = c;
 		c->parent = p;
-		if( 0 != p ) p->rchild = c;
+		//if( 0 != p ) p->rchild = c;
+		//if( c->lchild ){
+		//	if( c->lchild->rchild ) c->lchild = syn_adjust_prior( c->lchild );
+		//}
 		return c;
 	}
 	return node;
@@ -72,6 +76,7 @@ static SynNode *syn_adjust_prior( SynNode *node )
 
 static void syn_token_next( SynState *ss ) { ss->pos = ss->pos->next; }
 static int syn_token_type( SynState *ss ) { return ss->pos->token.type; }
+static int syn_token_subtype( SynState *ss ) { return ss->pos->token.sub_type; }
 static int syn_token_lineno( SynState *ss ) { return ss->pos->line_num; }
 static char* syn_token_value( SynState *ss ) { return ss->pos->token.value; }
 static void syn_insert_rchild ( SynNode *node, SynNode *child ) { node->rchild = child; if( child ) child->parent = node; }
@@ -88,8 +93,34 @@ static SynNode *syn_create_node( int type, int subType, SynState *ss )
 	node->lchild = 0;
 	node->rchild = 0;
 	node->sym_table = 0;
-	node->value.str_val = syn_token_value( ss );
+	node->node_sym.value.str_val = syn_token_value( ss );
 	return node;
+}
+
+int my_strlen( char *str )
+{
+	int len = 0;
+	if( !str ) return 0;
+	while( str[len] != '\0' )
+	{
+		len++;
+	}
+	return len;
+}
+
+int my_strcmp( char *src, char *dst )
+{
+	int sl = my_strlen(src);
+	int dl = my_strlen(dst);
+	if(sl != dl)
+		return -1;
+	int i = 0;
+	for( i = 0; i < sl; i++ )
+		if( src[i] > dst[i] )
+			return 1;
+		else if(src[i] < dst[i])
+			return -1;
+	return 0;
 }
 
 static Symbol* syn_sym_qurry( SynNode *pos, char *name )
@@ -101,7 +132,7 @@ static Symbol* syn_sym_qurry( SynNode *pos, char *name )
     		Symbol *tmp = pos->sym_table;
     		while( tmp )
     		{
-    	    	if( strcmp( tmp->name, name ) == 0 )
+    	    	if( my_strcmp( tmp->name, name ) == 0 )
     	    		return tmp;
     	    	tmp  = tmp->next;
     		}
@@ -111,7 +142,7 @@ static Symbol* syn_sym_qurry( SynNode *pos, char *name )
     return 0;
 }
 
-static int syn_update_sym_table( SynNode *pos, char *name, int type, char *value )
+static Symbol* syn_update_sym_table( SynNode *pos, char *name, int type, char *value )
 {
 	if( !pos )
 		return -1;
@@ -123,6 +154,13 @@ static int syn_update_sym_table( SynNode *pos, char *name, int type, char *value
     sb->name = name;
     sb->type = type;
     sb->value.str_val = value;
+    if( 0 == name )//const
+    {
+    	if( type == TK_CHAR )
+    		sb->value.char_val = value[0];
+    	else if( type == TK_NUMBER )
+    		sb->value._number = str2number( value );
+    }
     sb->next = 0;
     sb->func_info = (void*)pos;
     sb->index = -1;
@@ -130,13 +168,13 @@ static int syn_update_sym_table( SynNode *pos, char *name, int type, char *value
     {
     	sb->index = global_id_num++;
     	pos->sym_table = sb;
-    	return sb->index;
+    	return sb;
     }
     int flag = 0;
     while( tmp )
     {
-    	if( strcmp( tmp->name, name ) == 0 )
-    		flag = 1;//error ID is defined multiple times in the same domain
+    	if( name && my_strcmp( tmp->name, name ) == 0 )
+    		flag = 1;//error ID is defined multiple times in the same scope
     	if( 0 == tmp->next )
     		break;
     	tmp  = tmp->next;
@@ -146,7 +184,8 @@ static int syn_update_sym_table( SynNode *pos, char *name, int type, char *value
     	tmp->next = sb;
     	sb->index = global_id_num++;//tmp->index + 1;
     }
-    return sb->index;
+   // return sb->index;
+    return sb;
 }
 
 static SynNode *syn_id_def_parse( SynState *ss, SynNode *parent, int step, int type, int func_flag ) /* func_flag is for func_def parsing */
@@ -155,7 +194,7 @@ static SynNode *syn_id_def_parse( SynState *ss, SynNode *parent, int step, int t
 	if( syn_token_type( ss ) == TK_ID )
 	{
 		node = syn_create_node( STMT, VAR_DEF, ss ); node->parent = parent;
-		node->rnum = syn_update_sym_table( node, syn_token_value( ss ), syn_token_type( ss ), 0 );
+		node->rsymbol = syn_update_sym_table( node, syn_token_value( ss ), syn_token_type( ss ), 0 );
 		syn_token_next( ss );
 		if( syn_token_type( ss ) == '=' )
 		{
@@ -237,7 +276,7 @@ static SynNode *syn_func_def_parse( SynState *ss, SynNode *parent )
 	if( syn_token_type( ss ) != TK_ID )
 		return node;
 	node = syn_create_node( DOMAIN, FUNC_DEF, ss );
-	node->rnum = syn_update_sym_table( node, syn_token_value( ss ), FUNC, 0 );
+	node->rsymbol = syn_update_sym_table( node, syn_token_value( ss ), FUNC, 0 );
 	syn_token_next( ss );
 	if( syn_token_type( ss ) != '(' )
 		;//error
@@ -265,13 +304,14 @@ static SynNode *syn_if_parse( SynState *ss, SynNode *parent, int type )
 	node = syn_create_node( DOMAIN, type, ss );
 	node->parent = parent;
 	syn_token_next( ss );
-	syn_insert_lchild( node, syn_exp_parse( ss, node ) );
+	if( type != TK_ELSE )
+		syn_insert_lchild( node, syn_exp_parse( ss, node ) );
 	if( syn_token_type( ss ) != TK_DO )
 		;//error
 	else
 	{
 		syn_token_next( ss );
-		syn_insert_rchild( node, syn_domain_parse( ss, parent ) );
+		syn_insert_rchild( node, syn_domain_parse( ss, node ) );
 		if( syn_token_type( ss ) != TK_OD )
 			;//error
 		syn_token_next( ss );
@@ -282,7 +322,7 @@ static SynNode *syn_if_parse( SynState *ss, SynNode *parent, int type )
 static SynNode *syn_while_do_parse( SynState *ss, SynNode *parent )
 {
 	SynNode *node, *node1, *node2;
-	node = syn_create_node( DOMAIN, WHILE, ss );
+	node = syn_create_node( DOMAIN, TK_WHILE, ss );
 	node->parent = parent;
 	syn_token_next( ss );
 	syn_insert_lchild( node, syn_exp_parse( ss, node ) );
@@ -299,6 +339,8 @@ static SynNode *syn_while_do_parse( SynState *ss, SynNode *parent )
 	return node;
 }
 
+//static int compare_sym_type( Symbol *s1, Symbol *s2 )
+
 static SynNode *syn_func_call_parse( SynState *ss, SynNode *parent )
 {
 	SynNode *node = 0, *fnode, *plist;
@@ -310,13 +352,33 @@ static SynNode *syn_func_call_parse( SynState *ss, SynNode *parent )
 	if( ty != '(' )
 		;//error
 
+	node = syn_create_node( EXP, FUNC_CALL, ss );
 	while( plist )
 	{
 		syn_token_next( ss );
 	    ty = syn_token_type( ss );
 	    if( TK_ID == ty )
 	    {
-	    	Symbol *tmp = syn_qurry_symtable( parent );
+	    	Symbol *tmp = syn_sym_qurry( parent, ss->pos->token.value );
+	    	if( plist->node_sym.type == tmp->type )
+	    		;//
+	    	else
+	    		;//error
+	    }
+	    plist = plist->sibling;
+	    if( plist == 0 )
+	    {
+	    	syn_token_next( ss );
+	    	ty = syn_token_type( ss );
+	    	if( ty != ')' )
+	    		;//error
+	    }
+	    else
+	    {
+			syn_token_next( ss );
+		    ty = syn_token_type( ss );
+		    if( ty != ',' )
+		    	;//error
 	    }
 	}
 	return node;
@@ -324,31 +386,32 @@ static SynNode *syn_func_call_parse( SynState *ss, SynNode *parent )
 static SynNode *syn_exp_parse( SynState *ss, SynNode *parent )
 {
 	SynNode *node = 0;
+	Symbol *tmp;
 	int ty = syn_token_type( ss );
 	int index;
 	switch( ty )
 	{
 	case TK_ID: //MISS FUNC CALL
-		Symbol *tmp = syn_sym_qurry( parent, syn_token_value( ss ) );
-		if( index < 0 )
+		tmp = syn_sym_qurry( parent, syn_token_value( ss ) );
+		if( 0 == tmp )
 			;//error
 		node = syn_create_node( EXP, ID, ss );
-		node->rnum = tmp->index;
+		node->rsymbol = tmp;
 	case TK_CONST_VALUE:
 		if( ty != TK_ID )
 		{
 			node = syn_create_node( EXP, CONST, ss );
 			node->parent = parent;
 			Symbol *tmp = syn_sym_qurry( node, syn_token_value( ss ) );
-			if( tmp->index < 0 )
-				node->rnum = syn_update_symtable( node, 0, CONST, ss->pos->token.value );
-			else node->rnum = tmp->index;
+			if( 0 == tmp )
+				node->rsymbol = syn_update_sym_table( node, 0, syn_token_subtype( ss ), ss->pos->token.value );
+			else node->rsymbol = tmp;
 		}
 		syn_token_next( ss );
 	    ty = syn_token_type( ss );
-		if( '+' == ty || '-' == ty || '*' == ty || '/' == ty || '%' == ty )
+		if( operator_check( ty ) )
 		{
-			SynNode *node2 = syn_create_node( EXP, OP, ss );
+			SynNode *node2 = syn_create_node( EXP, ty, ss );
 			syn_insert_lchild( node2, node );
 			syn_token_next( ss );
 			syn_insert_rchild( node2, syn_exp_parse( ss, parent ) );
@@ -364,20 +427,24 @@ static SynNode *syn_exp_parse( SynState *ss, SynNode *parent )
 		}
 		return node;
 	case '(':
-		node = syn_create_node( EXP, -1, ss );
+		node = syn_create_node( EXP, '(', ss );
 		syn_token_next( ss );
 		node->lchild = syn_exp_parse( ss, parent );
 		if( syn_token_type( ss ) == ')' )
 		{
 			syn_token_next( ss );
 			ty = syn_token_type( ss );
-			if( '+' == ty || '-' == ty || '*' == ty || '/' == ty || '%' == ty )
+			if( operator_check( ty ) )
 			{
-				SynNode *node2 = syn_create_node( EXP, OP, ss );
+				SynNode *node2 = syn_create_node( EXP, ty, ss );
 				node2->lchild = node;
 				syn_token_next( ss );
 				node2->rchild = syn_exp_parse( ss, parent );
-				return syn_adjust_prior( node2 );
+				SynNode *tmpNode = syn_adjust_prior( node2 );
+				if( tmpNode != node2 )
+					if( tmpNode->lchild )
+						tmpNode->lchild = syn_adjust_prior( tmpNode->lchild );
+				return tmpNode;
 			}
 			return node;
 		}
@@ -387,6 +454,15 @@ static SynNode *syn_exp_parse( SynState *ss, SynNode *parent )
 		return 0;
 	// FUNC CALL
 	}
+	return 0;
+}
+
+int operator_check( int type )
+{
+	if( '+' == type || '-' == type || '*' == type || '/' == type || '%' == type ||\
+			TK_EQ == type || TK_GE == type || TK_LE == type || TK_NE == type ||\
+			TK_AND == type || TK_OR == type || '>' == type || '<' == type )
+		return 1;
 	return 0;
 }
 
@@ -400,7 +476,7 @@ static void syn_node_print( SynNode *node, int step) /*for debug*/
 			if( node->parent )
 				if( node == node->parent->lchild ) printf( "L" );
 			    else printf( "R" );
-		printf("s%d: %s   ", step, node->value.str_val);
+		printf("s%d: %s   ", step, node->node_sym.value.str_val);
 		if( node->type == DOMAIN )
 		{
 			printf( "domain " );
@@ -448,21 +524,21 @@ static SynNode *syn_domain_parse( SynState *ss, SynNode *parent )
 				break;
 			}
 		case Tk_CONST:
-		case TK_INT:
-		case TK_LONG:
-		case TK_LONGLONG:
-		case TK_UINT:
-		case TK_ULONG:
-		case TK_ULONGLONG:
-		case TK_SHORT:
-		case TK_USHORT:
-		case TK_FLOAT:
-		case TK_DOUBLE:
+//		case TK_INT:
+//		case TK_LONG:
+//		case TK_LONGLONG:
+//		case TK_UINT:
+//		case TK_ULONG:
+//		case TK_ULONGLONG:
+//		case TK_SHORT:
+//		case TK_USHORT:
+//		case TK_FLOAT:
+		case TK_NUMBER:
 		case TK_CHAR:
 			node = syn_id_def_parse( ss, parent, 0 , syn_token_type( ss ), 0 );
 			node->parent = parent;
 			tmp = node;
-			while( tmp ) /* add id_def to symbol table del?*/
+			/*while( tmp ) /* add id_def to symbol table del?
 			{
 				if( tmp->subType.stmt == ASSIGN )
 				{
@@ -474,13 +550,13 @@ static SynNode *syn_domain_parse( SynState *ss, SynNode *parent )
 				else
 				    syn_update_sym_table( tmp, tmp->value.str_val, tmp->type, 0 );
 				tmp = tmp->sibling;
-			}
+			}*/
 			break;
 		case TK_FUNCTION:
 			node = syn_func_def_parse( ss, parent );
 			node->parent = parent;
 			tmp = node;
-			while( tmp ) /* add param_def of function to symbol table */
+			/*while( tmp ) /* add param_def of function to symbol table
 			{
 				if( tmp->type == DOMAIN )
 					syn_update_sym_table( tmp->parent, tmp->value.str_val, tmp->type, 0 );
@@ -494,22 +570,22 @@ static SynNode *syn_domain_parse( SynState *ss, SynNode *parent )
 				else
 				    syn_update_sym_table( tmp, tmp->value.str_val, tmp->type, 0 );
 				tmp = tmp->sibling;
-			}
+			}*/
 			//syn_token_next( ss );
 			break;
 		case TK_IF:
-			node = syn_if_parse( ss, parent, IF );
+			node = syn_if_parse( ss, parent, TK_IF );
 			//syn_token_next( ss );
 			break;
 		case TK_ELIF:
-			if( pre && ( IF == pre->subType.exp || ELIF == pre->subType.exp ) )
-				node = syn_if_parse( ss, parent, ELIF );
+			if( pre && ( TK_IF == pre->subType.exp || TK_ELIF == pre->subType.exp ) )
+				node = syn_if_parse( ss, parent, TK_ELIF );
 			else
 				;//error
 			break;
 		case TK_ELSE:
-			if( pre && ( IF == pre->subType.exp || ELIF == pre->subType.exp ) )
-				node = syn_if_parse( ss, parent, ELSE );
+			if( pre && ( TK_IF == pre->subType.exp || TK_ELIF == pre->subType.exp ) )
+				node = syn_if_parse( ss, parent, TK_ELSE );
 			else
 				;//error
 			break;
@@ -517,6 +593,12 @@ static SynNode *syn_domain_parse( SynState *ss, SynNode *parent )
 			node = syn_while_do_parse( ss, parent );
 			//syn_token_next( ss );
 			break;
+		case TK_BREAK:
+			node = syn_create_node( STMT, TK_BREAK, ss );
+			syn_token_next( ss );
+		case TK_CONTINUE:
+			node = syn_create_node( STMT, TK_CONTINUE, ss );
+			syn_token_next( ss );
 		case TK_DO:
 			tmp = syn_create_node( DOMAIN, -1, ss );
 			tmp->parent = parent;
@@ -559,7 +641,7 @@ SynNode *syn_parse( SynState *ss )
 {
 	global_id_num = 0;
 	SynNode *node = syn_create_node( DOMAIN, GLOBAL, ss );
-	syn_insert_lchild( node, syn_domain_parse( ss, node ) );
+	syn_insert_rchild( node, syn_domain_parse( ss, node ) );
 	syn_node_print( node, 0 );
 	return node;
 }

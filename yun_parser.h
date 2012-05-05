@@ -21,12 +21,12 @@ typedef enum {
 
 /* exp type */
 typedef enum {
-	ID, CONST, OP, FUNC_CALL
+	ID, CONST_VAL, OP, FUNC_CALL
 }ExpType;
 
 /* domain type */
 typedef enum {
-	GLOBAL, FUNC_DEF, FOR, WHILE, IF, ELIF, ELSE
+	GLOBAL, FUNC_DEF, FOR, WHILE, IF, ELIF, ELSE, MAIN
 }DomainType;
 
 typedef struct priority{
@@ -47,6 +47,8 @@ typedef struct SynNode{
 	}subType;
 	int op;
 	int rnum;
+	int offset;
+	Symbol *rsymbol;
     Symbol node_sym;
     Symbol *sym_table; /* for domain node */
     Symbol *sym_table_const;
@@ -64,6 +66,8 @@ typedef struct SynState
 
 /* parse a token list */
 SynNode *syn_parse( SynState *ss );
+
+int operator_check( int type );
 
 /* destroy a syntax tree */
 void syn_destroy( SynNode* tree );

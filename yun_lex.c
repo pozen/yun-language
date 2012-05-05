@@ -10,9 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
+#include <math.h>
 
 /* reserved words */
-const Token key_tokens[] =
+const Token key_tokens[21] =
 {
 		{ TK_AND, 0, "and" },
 		{ TK_BREAK, 0, "break" },
@@ -32,16 +33,16 @@ const Token key_tokens[] =
 		{ TK_RETURN, 0, "return" },
 		{ TK_TRUE, 0, "true" },
 		{ TK_WHILE, 0, "while" },
-		{ TK_INT, 0, "int" },
-		{ TK_LONG, 0, "long" },
-		{ TK_LONGLONG, 0, "llong" },
-		{ TK_UINT, 0, "uint" },
-		{ TK_ULONG, 0, "ulong" },
-		{ TK_ULONGLONG, 0, "ullong" },
-		{ TK_SHORT, 0, "short" },
-		{ TK_USHORT, 0, "ushort" },
-		{ TK_FLOAT, 0, "float" },
-		{ TK_DOUBLE, 0, "double" },
+		//{ TK_INT, 0, "int" },
+		//{ TK_LONG, 0, "long" },
+		//{ TK_LONGLONG, 0, "llong" },
+		//{ TK_UINT, 0, "uint" },
+		//{ TK_ULONG, 0, "ulong" },
+		//{ TK_ULONGLONG, 0, "ullong" },
+		//{ TK_SHORT, 0, "short" },
+		//{ TK_USHORT, 0, "ushort" },
+		//{ TK_FLOAT, 0, "float" },
+		//{ TK_DOUBLE, 0, "double" },
 		{ Tk_CONST, 0, "const" },
 		{ 0, 0, "NULL" }
 };
@@ -124,7 +125,7 @@ static LexToken* lex_read_number( LexToken* cur, int lineno, const char* src, in
 			tmp[len++] = '.', *index = *index + 1, flag++;
 	}
 	tmp[len] = 0;
-	return lex_add_token( cur, lineno, TK_CONST_VALUE, flag ? TK_FLOAT : TK_INT, tmp );
+	return lex_add_token( cur, lineno, TK_CONST_VALUE, TK_NUMBER, tmp );
 }
 
 static LexToken* lex_read_id( LexToken* cur, int lineno, const char* src, int* index )
@@ -231,6 +232,32 @@ LexToken* lex_get_token( const char* source )
 	cur->pre->next = 0;
 	free(cur);
 	return first;
+}
+
+yl_number str2number( const char* str )
+{
+	yl_number num = 0;
+	if( 0 == str )
+		return num;
+	int i = 0;
+	int f = 0;
+	int d = 1;
+	while( str[i] != '\0' )
+	{
+		if( str[i] == '.' ) f = 1;
+		else
+		{
+			if( !f )
+				num = num * 10 + str[i] - '0';
+			else
+			{
+				num = num + ( str[i] - '0' ) * pow( 0.1, d );
+				d++;
+			}
+		}
+		i++;
+	}
+	return num;
 }
 
 void lex_destroy_token( LexToken* tk )

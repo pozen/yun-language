@@ -8,11 +8,13 @@
 #ifndef __YUN_SYMTABLE_H_
 #define __YUN_SYMTABLE_H_
 
-#include <stddef.h>
+//#include <stddef.h>
+#include "yun_lex.h"
 
 /* symbol type */
-typedef enum SymType { FUNC, INT, UINT, SHORT, USHORT, CHAR, UCHAR, LONG,\
-	ULONG, LONGLONG, ULONGLONG, FLOAT, DOUBLE, STRING, CONST }SymType;
+//typedef enum SymType { FUNC = 0, UINT, USHORT, UCHAR,\
+	ULONG, LONGLONG, ULONGLONG, CHAR, INT, SHORT, LONG, FLOAT, DOUBLE, STRING, CONST }SymType;
+typedef enum SymType { FUNC = 0, NUMBER, CHAR, STRING, CONST }SymType;
 
 /* symbol value */
 typedef struct SymValue
@@ -31,22 +33,25 @@ typedef struct SymValue
 		//unsigned long long  ull_val;
 		float float_val;
 		double double_val;
+		yl_number _number;
 		char *str_val;
-		void *addr_val;
-		struct
+		struct /*for array*/
 		{
-			struct SymValue *addr;
-			size_t size;
+			void *addr;
+			short unit_size;
+			short len;
 		};
 	};
 }SymValue;
 
 typedef struct Symbol
 {
-	char *name;
+	char *name; /*0 == const type*/
 	struct SymValue value;
 	SymType type;
-	int index;
+	unsigned int index;
+	int offset;
+	struct Symbol *addr;
 	struct Symbol *next;
 	void *func_info;
 }Symbol;

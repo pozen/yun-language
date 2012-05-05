@@ -6,11 +6,12 @@
  */
 #include "yun_lex.h"
 #include "yun_parser.h"
-#include <stdio.h>
+#include "yun_vm.h"
+#include "stdio.h"
 
 int main()
 {
-	FILE *fp = fopen( "lex_test", "rb" );
+	FILE *fp = fopen( "lex_ss", "rb" );
 	int size;
 	char *buf;
 	if( fp == 0 )
@@ -37,7 +38,10 @@ int main()
 		printf("line:%d type:%d value:%s\n", tmp->line_num, tmp->token.type, tmp->token.value);
 		tmp = tmp->next;
 	}*/
-	syn_parse( ss );
+	SynNode *st = syn_parse( ss );
+	VM *vm = create_vm();
+	create_bytecode( st, "main", vm );
+	execute( vm );
 
 	lex_destroy_token( tk );
 	printf("end\n");

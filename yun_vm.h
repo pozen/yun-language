@@ -8,7 +8,8 @@
 #ifndef __YUN_VM_H_
 #define __YUN_VM_H_
 
-#include <stdio.h>
+//#include <stdio.h>
+#include "yun_symtable.h"
 
 typedef enum{
  iAB, iAx, isAx
@@ -44,6 +45,8 @@ typedef enum{
 
 typedef enum {
 	OP_MOVE,
+	OP_MOVEI,
+	OP_MOVES,
 	OP_LOAD,
 	OP_ADD,
 	OP_SUB,
@@ -60,6 +63,12 @@ typedef enum {
 	OP_EQ,
 	OP_LT,
 	OP_LE,
+	OP_GE,
+	OP_NE,
+	OP_G,
+	OP_L,
+	OP_OR,
+	OP_AND,
 
 	OP_CALL,
 	OP_RETURN,
@@ -68,38 +77,64 @@ typedef enum {
 } OpCode;
 
 #define DEFAULT_RSIZE 256
+#define MAX_PARAM_NUM 16
 
 typedef struct State {
 	char *name;
-	void *R[DEFAULT_RSIZE];
-	void *K[DEFAULT_RSIZE];
-	size_t clen;
+	//Symbol R[DEFAULT_RSIZE*2];
+	//size_t *S[DEFAULT_RSIZE*2];
+	SymValue K[DEFAULT_RSIZE];
+	int clen;
 	int *code;
 	size_t mlen;
-	State *next;
+	size_t pnum;
+	size_t param[MAX_PARAM_NUM];
+	char* sbp;
+	int soffset;
+	size_t kcnt;
+	struct State *next;//?
 } State;
-
-typedef struct {
-	int AX;
-	int BX;
-	int CX;
-	int IP;
-	int IF;
-
-	int stacksize;
-	int *stack;
-	State *state;
-} VM;
-
-struct SynNode;
 
 #define DEFAULT_MEM_LEN 8096
 #define MAX_STATE_NUM 2048
-State *__global_state_table[MAX_STATE_NUM];
+#define MAX_IF_BRANCH_NUM 100
 
-State *create_bytecode( SynNode *sn, char *name );
+typedef struct {
+	size_t snum;
+	size_t rvalue;
+}FuncCall;
+
+typedef struct {
+	SymValue ip;
+	SymValue dx;
+	SymValue cx;
+	SymValue bx;
+	SymValue ax;
+	//int if;
+    char *sp;
+	char *bp;
+	char *hp;
+	char *shp;
+	int stacksize;
+	FuncCall fc;
+	State *__global_state_table[MAX_STATE_NUM];
+} VM;
+
+struct SynNode;
+#define REGISTER_NUM 5
+#define AX 8187
+#define BX 8188
+#define CX 8189
+#define DX 8190
+#define IP 8191
+
+#define DEFAULT_STACK_SIZE 1024*1024
+
+struct SynNode;
+State *create_bytecode( struct SynNode *sn, char *name, VM *vm );
 State *load_bytecode( char *filename );
+VM* create_vm();
 int save_bytecode( char *filename, State* s );
-void execute( State *s );
+void execute( VM *vm );
 
 #endif /* __YUN_VM_H_ */
